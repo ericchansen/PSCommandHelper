@@ -15,8 +15,20 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-# Determine target module path
-$modulesDir = Join-Path ([Environment]::GetFolderPath('MyDocuments')) 'PowerShell\Modules\PSCommandHelper'
+# Determine target module path (cross-platform)
+$userModulePaths = $env:PSModulePath -split [IO.Path]::PathSeparator
+# Pick the first user-scoped path (typically user's home-based modules directory)
+$targetBase = $userModulePaths | Where-Object {
+    $_ -like "*$([Environment]::GetFolderPath('UserProfile'))*" -or
+    $_ -like "$HOME*"
+} | Select-Object -First 1
+
+if (-not $targetBase) {
+    # Fallback: first path in PSModulePath
+    $targetBase = $userModulePaths[0]
+}
+
+$modulesDir = Join-Path $targetBase 'PSCommandHelper'
 $sourceDir  = Join-Path $PSScriptRoot 'PSCommandHelper'
 
 if (-not (Test-Path $sourceDir)) {

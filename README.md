@@ -1,22 +1,25 @@
 # PSCommandHelper
 
-> Learn PowerShell by doing. When you type a bash command that doesn't exist in PowerShell, PSCommandHelper suggests the PowerShell equivalent — with an explanation.
+> Learn PowerShell by doing. When you type a bash command that doesn't work in PowerShell, PSCommandHelper suggests the PowerShell equivalent — with an explanation.
 
 ## What it does
 
-When you type a bash/Linux command in PowerShell 7 that doesn't resolve (like `rm -rf`, `grep`, `curl`, etc.), PSCommandHelper intercepts the error and shows you:
+PSCommandHelper uses **two-tier detection** to catch bash commands in PowerShell 7:
+
+1. **CommandNotFoundAction hook** — catches commands that don't exist at all (`grep`, `awk`, `sed`, `chmod`, `touch`, etc.)
+2. **Prompt handler** — catches aliased commands used with bash-style flags (`ls -la`, `rm -rf`, `ps aux`, etc.)
 
 ```
 ────────────────────────────────────────────────────────────
   💡 PSCommandHelper
 
-  You typed:  rm -rf
-  Try this:   Remove-Item -Recurse -Force
+  You typed:  grep
+  Try this:   Select-String
 
-  Remove-Item deletes files/folders. -Recurse handles subdirectories, -Force skips confirmation.
+  Select-String (alias: sls) searches for text patterns in files or pipeline input.
 
   Example:
-  > Remove-Item ./build -Recurse -Force
+  > Select-String -Path ./app.log -Pattern "error"
 ────────────────────────────────────────────────────────────
 ```
 
@@ -27,12 +30,12 @@ It **does not** run the command for you — the goal is to help you learn, not t
 ### Quick install
 
 ```powershell
-git clone <repo-url> powershell-helper
-cd powershell-helper
+git clone https://github.com/ericchansen/PSCommandHelper.git
+cd PSCommandHelper
 .\install.ps1
 ```
 
-This copies the module to your `Documents\PowerShell\Modules` folder and adds it to your `$PROFILE`.
+This copies the module to your user Modules folder and adds it to your `$PROFILE`. Works on Windows, Linux, and macOS.
 
 ### Manual install
 
@@ -61,6 +64,14 @@ Get-CommandMapping -Search "grep"
 Get-CommandMapping -Search "file"
 ```
 
+### Filter by detection type
+
+```powershell
+Get-CommandMapping -Type Hook        # Commands that trigger the hook (grep, sed, awk...)
+Get-CommandMapping -Type Aliased     # Commands aliased in PS (ls, rm, cp, cat...)
+Get-CommandMapping -Type Executable  # Commands that exist as .exe (curl, ping, ssh...)
+```
+
 ### Temporarily disable
 
 ```powershell
@@ -72,6 +83,16 @@ Disable-PSCommandHelper
 ```powershell
 Enable-PSCommandHelper
 ```
+
+## How detection works
+
+Each mapping is tagged with a `Type` that determines how it's detected:
+
+| Type | Icon | Detection Method | Examples |
+|------|------|-----------------|----------|
+| **Hook** | 🔵 | `CommandNotFoundAction` — command doesn't exist in PS | `grep`, `awk`, `sed`, `chmod`, `touch`, `head`, `tail` |
+| **Aliased** | 🟡 | Prompt handler — command exists as a PS alias but bash-style flags fail | `ls -la`, `rm -rf`, `cp -r`, `ps aux`, `kill -9` |
+| **Executable** | 🟢 | Informational — command resolves as a Windows .exe | `curl`, `ping`, `ssh`, `tar`, `netstat` |
 
 ## Covered commands
 
@@ -89,21 +110,13 @@ The built-in mapping table covers **75+ bash commands** across these categories:
 ## Requirements
 
 - **PowerShell 7.0+** (uses `CommandNotFoundAction` which is not available in Windows PowerShell 5.1)
+- **PS 7.2+** recommended for `$PSStyle` color support (falls back to raw ANSI on 7.0-7.1)
 
 ## Running tests
 
 ```powershell
 Invoke-Pester ./tests/PSCommandHelper.Tests.ps1
 ```
-
-## How it works
-
-PowerShell 7 exposes the `$ExecutionContext.InvokeCommand.CommandNotFoundAction` event. When the shell can't find a command by name, this event fires **before** the error is shown. PSCommandHelper registers a handler that:
-
-1. Receives the unrecognized command name
-2. Looks it up in a hashtable of bash → PowerShell mappings
-3. Displays a colorful, educational suggestion
-4. Lets the original error propagate (so you know the command didn't run)
 
 ## License
 

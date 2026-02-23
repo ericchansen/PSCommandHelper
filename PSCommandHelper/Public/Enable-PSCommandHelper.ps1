@@ -64,4 +64,7 @@ function Enable-PSCommandHelper {
     $script:PSCommandHelperHandler = $typedHandler
 
     Write-Host "✅ PSCommandHelper enabled. Type a bash command to see the PowerShell equivalent!" -ForegroundColor Green
+
+    # Also register the prompt handler for aliased commands (ls -la, rm -rf, etc.)
+    Register-PSCommandHelperPrompt
 }
