@@ -16,13 +16,14 @@ Describe 'CommandMap' {
         }
     }
 
-    It 'each entry has required keys' {
+    It 'each entry has required keys including Type' {
         InModuleScope PSCommandHelper {
             $map = Get-BashToPowerShellMap
             foreach ($entry in $map) {
                 $entry.Bash        | Should -Not -BeNullOrEmpty
                 $entry.PowerShell  | Should -Not -BeNullOrEmpty
                 $entry.Explanation | Should -Not -BeNullOrEmpty
+                $entry.Type        | Should -BeIn @('Hook', 'Aliased', 'Executable')
             }
         }
     }
@@ -37,18 +38,47 @@ Describe 'CommandMap' {
             $bashCmds | Should -Contain 'cat'
         }
     }
+
+    It 'tags aliased commands correctly' {
+        InModuleScope PSCommandHelper {
+            $map = Get-BashToPowerShellMap
+            $aliased = $map | Where-Object { $_.Type -eq 'Aliased' }
+            $aliasedBash = $aliased | ForEach-Object { ($_.Bash -split '\s+')[0] } | Sort-Object -Unique
+            # These should all be Aliased
+            @('rm', 'ls', 'cp', 'mv', 'cat') | ForEach-Object {
+                $_ | Should -BeIn $aliasedBash
+            }
+        }
+    }
+
+    It 'tags hook commands correctly' {
+        InModuleScope PSCommandHelper {
+            $map = Get-BashToPowerShellMap
+            $hooks = $map | Where-Object { $_.Type -eq 'Hook' }
+            $hookBash = $hooks | ForEach-Object { ($_.Bash -split '\s+')[0] } | Sort-Object -Unique
+            @('grep', 'sed', 'awk', 'chmod', 'touch') | ForEach-Object {
+                $_ | Should -BeIn $hookBash
+            }
+        }
+    }
 }
 
 Describe 'Get-CommandMapping' {
     It 'returns all mappings when no search term is given' {
         $result = Get-CommandMapping 6>&1
-        # Should produce output (Write-Host captured via 6>&1)
         $result | Should -Not -BeNullOrEmpty
     }
 
     It 'filters by search term' {
         $result = Get-CommandMapping -Search 'grep' 6>&1
         $resultText = $result -join "`n"
+        $resultText | Should -Match 'grep'
+    }
+
+    It 'filters by Type' {
+        $result = Get-CommandMapping -Type 'Hook' 6>&1
+        $resultText = $result -join "`n"
+        # Hook commands like grep should be present, aliased ones like ls should not
         $resultText | Should -Match 'grep'
     }
 
@@ -60,16 +90,63 @@ Describe 'Get-CommandMapping' {
 }
 
 Describe 'Format-Suggestion' {
-    It 'produces output without error' {
+    It 'produces output without error for Hook type' {
         InModuleScope PSCommandHelper {
             $mapping = @{
-                Bash        = 'rm -rf'
-                PowerShell  = 'Remove-Item -Recurse -Force'
+                Bash        = 'grep'
+                PowerShell  = 'Select-String'
                 Explanation = 'Test explanation'
-                Example     = 'Remove-Item ./test -Recurse -Force'
+                Example     = 'Select-String -Path ./app.log -Pattern "error"'
+                Type        = 'Hook'
             }
-            { Format-Suggestion -Mapping $mapping -OriginalCommand 'rm -rf' 6>&1 } | Should -Not -Throw
+            { Format-Suggestion -Mapping $mapping -OriginalCommand 'grep' 6>&1 } | Should -Not -Throw
         }
+    }
+
+    It 'produces output without error for Aliased type' {
+        InModuleScope PSCommandHelper {
+            $mapping = @{
+                Bash        = 'ls -la'
+                PowerShell  = 'Get-ChildItem -Force'
+                Explanation = 'Test explanation'
+                Example     = 'Get-ChildItem -Force'
+                Type        = 'Aliased'
+            }
+            { Format-Suggestion -Mapping $mapping -OriginalCommand 'ls -la' 6>&1 } | Should -Not -Throw
+        }
+    }
+
+    It 'produces output without error for Executable type' {
+        InModuleScope PSCommandHelper {
+            $mapping = @{
+                Bash        = 'curl'
+                PowerShell  = 'Invoke-RestMethod'
+                Explanation = 'Test explanation'
+                Example     = 'Invoke-RestMethod https://example.com'
+                Type        = 'Executable'
+            }
+            { Format-Suggestion -Mapping $mapping -OriginalCommand 'curl' 6>&1 } | Should -Not -Throw
+        }
+    }
+}
+
+Describe 'Register/Unregister-PSCommandHelperPrompt' {
+    AfterEach {
+        Unregister-PSCommandHelperPrompt 6>&1 | Out-Null
+    }
+
+    It 'registers without error' {
+        { Register-PSCommandHelperPrompt 6>&1 } | Should -Not -Throw
+    }
+
+    It 'unregisters without error' {
+        Register-PSCommandHelperPrompt 6>&1 | Out-Null
+        { Unregister-PSCommandHelperPrompt 6>&1 } | Should -Not -Throw
+    }
+
+    It 'is idempotent — double register does not error' {
+        Register-PSCommandHelperPrompt 6>&1 | Out-Null
+        { Register-PSCommandHelperPrompt 6>&1 } | Should -Not -Throw
     }
 }
 

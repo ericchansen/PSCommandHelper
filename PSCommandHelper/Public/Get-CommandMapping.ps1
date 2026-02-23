@@ -7,6 +7,8 @@ function Get-CommandMapping {
         Useful for proactive learning — browse the table to discover PowerShell equivalents.
     .PARAMETER Search
         Optional search term to filter mappings. Searches both bash and PowerShell columns.
+    .PARAMETER Type
+        Optional filter by detection type: Hook, Aliased, or Executable.
     .EXAMPLE
         Get-CommandMapping
         Lists all mappings.
@@ -14,13 +16,20 @@ function Get-CommandMapping {
         Get-CommandMapping -Search "grep"
         Shows mappings related to grep.
     .EXAMPLE
+        Get-CommandMapping -Type Hook
+        Shows only commands that trigger the CommandNotFoundAction hook.
+    .EXAMPLE
         Get-CommandMapping -Search "file"
         Shows mappings with "file" in any field.
     #>
     [CmdletBinding()]
     param(
         [Parameter(Position = 0)]
-        [string]$Search
+        [string]$Search,
+
+        [Parameter()]
+        [ValidateSet('Hook', 'Aliased', 'Executable')]
+        [string]$Type
     )
 
     $map = Get-BashToPowerShellMap
@@ -31,6 +40,10 @@ function Get-CommandMapping {
             $_.PowerShell -like "*$Search*" -or
             $_.Explanation -like "*$Search*"
         }
+    }
+
+    if ($Type) {
+        $map = $map | Where-Object { $_.Type -eq $Type }
     }
 
     if (-not $map) {
@@ -54,7 +67,8 @@ function Get-CommandMapping {
     Write-Host "  $dim$('─' * 56)$reset"
 
     foreach ($entry in $map) {
-        Write-Host "  $yellow$($entry.Bash.PadRight(20))$reset → $green${bold}$($entry.PowerShell)$reset"
+        $typeTag = switch ($entry.Type) { 'Hook' { '🔵' } 'Aliased' { '🟡' } 'Executable' { '🟢' } default { '⚪' } }
+        Write-Host "  $typeTag $yellow$($entry.Bash.PadRight(20))$reset → $green${bold}$($entry.PowerShell)$reset"
         Write-Host "  $dim$($entry.Explanation)$reset"
         Write-Host ""
     }

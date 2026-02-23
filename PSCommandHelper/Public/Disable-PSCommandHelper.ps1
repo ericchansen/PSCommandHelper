@@ -15,6 +15,10 @@ function Disable-PSCommandHelper {
             $ExecutionContext.InvokeCommand.CommandNotFoundAction = $newHandler
         }
         $script:PSCommandHelperHandler = $null
+
+        # Also unregister the prompt handler
+        Unregister-PSCommandHelperPrompt
+
         Write-Host "🔴 PSCommandHelper disabled." -ForegroundColor Yellow
     }
     else {
