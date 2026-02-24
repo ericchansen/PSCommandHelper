@@ -57,6 +57,18 @@ function Register-PSCommandHelperPrompt {
                         $lookupName = $cmdName
                     }
 
+                    # Reverse lookup: $cmdName may be the resolved cmdlet (e.g. Remove-Item)
+                    # Find aliases that point TO this cmdlet (e.g. rm → Remove-Item)
+                    if (-not $lookupName) {
+                        $reverseAliases = Get-Alias -Definition $cmdName -ErrorAction SilentlyContinue
+                        foreach ($ra in $reverseAliases) {
+                            if ($script:AliasedCommandMap.ContainsKey($ra.Name)) {
+                                $lookupName = $ra.Name
+                                break
+                            }
+                        }
+                    }
+
                     if ($lookupName -and $script:AliasedCommandMap.ContainsKey($lookupName)) {
                         $errString = $lastErr.ToString()
                         # Only show for parameter-binding or argument errors (bash-style flags)
@@ -66,13 +78,44 @@ function Register-PSCommandHelperPrompt {
                                         $errString -match 'Cannot find a parameter'
 
                         if ($isParamError) {
-                            # Find the best matching entry (most specific first)
+                            # Find the best matching entry using flag-aware comparison
                             $line = if ($lastErr.InvocationInfo) { $lastErr.InvocationInfo.Line.Trim() } else { $lookupName }
                             $entries = $script:AliasedCommandMap[$lookupName]
-                            $bestMatch = $entries | Sort-Object { $_.Bash.Length } -Descending |
-                                         Where-Object { $line -match [regex]::Escape($_.Bash) } |
-                                         Select-Object -First 1
 
+                            # Extract and normalize flags from the typed line
+                            $lineFlags = [System.Collections.Generic.HashSet[char]]::new()
+                            $lineParts = ($line -split '\s+') | Select-Object -Skip 1
+                            foreach ($part in $lineParts) {
+                                if ($part -match '^-([A-Za-z0-9]+)$') {
+                                    foreach ($ch in $Matches[1].ToCharArray()) { [void]$lineFlags.Add($ch) }
+                                }
+                            }
+
+                            $bestMatch = $null
+                            $bestScore = -1
+                            foreach ($entry in $entries) {
+                                $entryFlags = [System.Collections.Generic.HashSet[char]]::new()
+                                $entryParts = ($entry.Bash -split '\s+') | Select-Object -Skip 1
+                                foreach ($part in $entryParts) {
+                                    if ($part -match '^-([A-Za-z0-9]+)$') {
+                                        foreach ($ch in $Matches[1].ToCharArray()) { [void]$entryFlags.Add($ch) }
+                                    }
+                                }
+                                # Score: entry flags must be a subset of typed flags; more flags = better match
+                                if ($entryFlags.Count -gt 0 -and $entryFlags.IsSubsetOf($lineFlags)) {
+                                    if ($entryFlags.Count -gt $bestScore) {
+                                        $bestScore = $entryFlags.Count
+                                        $bestMatch = $entry
+                                    }
+                                }
+                            }
+
+                            # Fallback: substring match or base command
+                            if (-not $bestMatch) {
+                                $bestMatch = $entries | Sort-Object { $_.Bash.Length } -Descending |
+                                             Where-Object { $line -match [regex]::Escape($_.Bash) } |
+                                             Select-Object -First 1
+                            }
                             if (-not $bestMatch) {
                                 $bestMatch = $entries | Select-Object -First 1
                             }

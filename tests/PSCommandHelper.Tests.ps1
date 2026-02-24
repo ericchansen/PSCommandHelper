@@ -150,6 +150,215 @@ Describe 'Register/Unregister-PSCommandHelperPrompt' {
     }
 }
 
+Describe 'Prompt handler: reverse alias lookup' {
+    BeforeAll {
+        InModuleScope PSCommandHelper {
+            $map = Get-BashToPowerShellMap
+            $script:TestAliasedMap = @{}
+            foreach ($entry in ($map | Where-Object { $_.Type -eq 'Aliased' })) {
+                $baseCmd = ($entry.Bash -split '\s+')[0]
+                if (-not $script:TestAliasedMap.ContainsKey($baseCmd)) {
+                    $script:TestAliasedMap[$baseCmd] = @()
+                }
+                $script:TestAliasedMap[$baseCmd] += $entry
+            }
+        }
+    }
+
+    It 'rm is in the aliased map' {
+        InModuleScope PSCommandHelper {
+            $script:TestAliasedMap.ContainsKey('rm') | Should -BeTrue
+        }
+    }
+
+    It 'Remove-Item reverse-resolves to rm which is in the aliased map' {
+        $aliases = Get-Alias -Definition 'Remove-Item' -ErrorAction SilentlyContinue
+        $aliasNames = $aliases | ForEach-Object { $_.Name }
+        $aliasNames | Should -Contain 'rm'
+    }
+
+    It 'Get-ChildItem reverse-resolves to ls which is in the aliased map' {
+        $aliases = Get-Alias -Definition 'Get-ChildItem' -ErrorAction SilentlyContinue
+        $aliasNames = $aliases | ForEach-Object { $_.Name }
+        $aliasNames | Should -Contain 'ls'
+    }
+
+    It 'Copy-Item reverse-resolves to cp which is in the aliased map' {
+        InModuleScope PSCommandHelper {
+            $aliases = Get-Alias -Definition 'Copy-Item' -ErrorAction SilentlyContinue
+            $found = $false
+            foreach ($a in $aliases) {
+                if ($script:TestAliasedMap.ContainsKey($a.Name)) {
+                    $found = $true
+                    break
+                }
+            }
+            $found | Should -BeTrue
+        }
+    }
+
+    It 'Move-Item reverse-resolves to mv which is in the aliased map' {
+        InModuleScope PSCommandHelper {
+            $aliases = Get-Alias -Definition 'Move-Item' -ErrorAction SilentlyContinue
+            $found = $false
+            foreach ($a in $aliases) {
+                if ($script:TestAliasedMap.ContainsKey($a.Name)) {
+                    $found = $true
+                    break
+                }
+            }
+            $found | Should -BeTrue
+        }
+    }
+}
+
+Describe 'Flag-aware matching' {
+    BeforeAll {
+        InModuleScope PSCommandHelper {
+            $map = Get-BashToPowerShellMap
+            $script:TestRmEntries = $map | Where-Object { ($_.Bash -split '\s+')[0] -eq 'rm' -and $_.Type -eq 'Aliased' }
+            $script:TestLsEntries = $map | Where-Object { ($_.Bash -split '\s+')[0] -eq 'ls' -and $_.Type -eq 'Aliased' }
+        }
+    }
+
+    It 'rm -fr matches rm -rf entry (flag reorder)' {
+        InModuleScope PSCommandHelper {
+            $line = 'rm -fr somedir'
+            $lineFlags = [System.Collections.Generic.HashSet[char]]::new()
+            $lineParts = ($line -split '\s+') | Select-Object -Skip 1
+            foreach ($part in $lineParts) {
+                if ($part -match '^-([A-Za-z0-9]+)$') {
+                    foreach ($ch in $Matches[1].ToCharArray()) { [void]$lineFlags.Add($ch) }
+                }
+            }
+
+            $bestMatch = $null
+            $bestScore = -1
+            foreach ($entry in $script:TestRmEntries) {
+                $entryFlags = [System.Collections.Generic.HashSet[char]]::new()
+                $entryParts = ($entry.Bash -split '\s+') | Select-Object -Skip 1
+                foreach ($part in $entryParts) {
+                    if ($part -match '^-([A-Za-z0-9]+)$') {
+                        foreach ($ch in $Matches[1].ToCharArray()) { [void]$entryFlags.Add($ch) }
+                    }
+                }
+                if ($entryFlags.Count -gt 0 -and $entryFlags.IsSubsetOf($lineFlags)) {
+                    if ($entryFlags.Count -gt $bestScore) {
+                        $bestScore = $entryFlags.Count
+                        $bestMatch = $entry
+                    }
+                }
+            }
+
+            $bestMatch | Should -Not -BeNull
+            $bestMatch.Bash | Should -Be 'rm -rf'
+            $bestMatch.PowerShell | Should -Be 'Remove-Item -Recurse -Force'
+        }
+    }
+
+    It 'rm -r -f matches rm -rf entry (separated flags)' {
+        InModuleScope PSCommandHelper {
+            $line = 'rm -r -f somedir'
+            $lineFlags = [System.Collections.Generic.HashSet[char]]::new()
+            $lineParts = ($line -split '\s+') | Select-Object -Skip 1
+            foreach ($part in $lineParts) {
+                if ($part -match '^-([A-Za-z0-9]+)$') {
+                    foreach ($ch in $Matches[1].ToCharArray()) { [void]$lineFlags.Add($ch) }
+                }
+            }
+
+            $bestMatch = $null
+            $bestScore = -1
+            foreach ($entry in $script:TestRmEntries) {
+                $entryFlags = [System.Collections.Generic.HashSet[char]]::new()
+                $entryParts = ($entry.Bash -split '\s+') | Select-Object -Skip 1
+                foreach ($part in $entryParts) {
+                    if ($part -match '^-([A-Za-z0-9]+)$') {
+                        foreach ($ch in $Matches[1].ToCharArray()) { [void]$entryFlags.Add($ch) }
+                    }
+                }
+                if ($entryFlags.Count -gt 0 -and $entryFlags.IsSubsetOf($lineFlags)) {
+                    if ($entryFlags.Count -gt $bestScore) {
+                        $bestScore = $entryFlags.Count
+                        $bestMatch = $entry
+                    }
+                }
+            }
+
+            $bestMatch | Should -Not -BeNull
+            $bestMatch.Bash | Should -Be 'rm -rf'
+        }
+    }
+
+    It 'ls -al matches ls -la entry (flag reorder)' {
+        InModuleScope PSCommandHelper {
+            $line = 'ls -al'
+            $lineFlags = [System.Collections.Generic.HashSet[char]]::new()
+            $lineParts = ($line -split '\s+') | Select-Object -Skip 1
+            foreach ($part in $lineParts) {
+                if ($part -match '^-([A-Za-z0-9]+)$') {
+                    foreach ($ch in $Matches[1].ToCharArray()) { [void]$lineFlags.Add($ch) }
+                }
+            }
+
+            $bestMatch = $null
+            $bestScore = -1
+            foreach ($entry in $script:TestLsEntries) {
+                $entryFlags = [System.Collections.Generic.HashSet[char]]::new()
+                $entryParts = ($entry.Bash -split '\s+') | Select-Object -Skip 1
+                foreach ($part in $entryParts) {
+                    if ($part -match '^-([A-Za-z0-9]+)$') {
+                        foreach ($ch in $Matches[1].ToCharArray()) { [void]$entryFlags.Add($ch) }
+                    }
+                }
+                if ($entryFlags.Count -gt 0 -and $entryFlags.IsSubsetOf($lineFlags)) {
+                    if ($entryFlags.Count -gt $bestScore) {
+                        $bestScore = $entryFlags.Count
+                        $bestMatch = $entry
+                    }
+                }
+            }
+
+            $bestMatch | Should -Not -BeNull
+            $bestMatch.Bash | Should -Be 'ls -la'
+        }
+    }
+
+    It 'rm -rf still matches exactly (no regression)' {
+        InModuleScope PSCommandHelper {
+            $line = 'rm -rf somedir'
+            $lineFlags = [System.Collections.Generic.HashSet[char]]::new()
+            $lineParts = ($line -split '\s+') | Select-Object -Skip 1
+            foreach ($part in $lineParts) {
+                if ($part -match '^-([A-Za-z0-9]+)$') {
+                    foreach ($ch in $Matches[1].ToCharArray()) { [void]$lineFlags.Add($ch) }
+                }
+            }
+
+            $bestMatch = $null
+            $bestScore = -1
+            foreach ($entry in $script:TestRmEntries) {
+                $entryFlags = [System.Collections.Generic.HashSet[char]]::new()
+                $entryParts = ($entry.Bash -split '\s+') | Select-Object -Skip 1
+                foreach ($part in $entryParts) {
+                    if ($part -match '^-([A-Za-z0-9]+)$') {
+                        foreach ($ch in $Matches[1].ToCharArray()) { [void]$entryFlags.Add($ch) }
+                    }
+                }
+                if ($entryFlags.Count -gt 0 -and $entryFlags.IsSubsetOf($lineFlags)) {
+                    if ($entryFlags.Count -gt $bestScore) {
+                        $bestScore = $entryFlags.Count
+                        $bestMatch = $entry
+                    }
+                }
+            }
+
+            $bestMatch | Should -Not -BeNull
+            $bestMatch.Bash | Should -Be 'rm -rf'
+        }
+    }
+}
+
 Describe 'Enable/Disable-PSCommandHelper' {
     AfterEach {
         Disable-PSCommandHelper 6>&1 | Out-Null
