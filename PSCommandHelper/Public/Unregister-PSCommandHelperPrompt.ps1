@@ -10,5 +10,6 @@ function Unregister-PSCommandHelperPrompt {
         $function:global:prompt = $script:OriginalPrompt
         $script:OriginalPrompt = $null
         $script:AliasedCommandMap = $null
+        $script:AliasedCmdletMap = $null
     }
 }

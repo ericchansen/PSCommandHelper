@@ -23,14 +23,24 @@ function Register-PSCommandHelperPrompt {
     # Build the aliased-command lookup from the map
     $map = Get-BashToPowerShellMap
     $aliasedMap = @{}
+    $aliasedCmdletMap = @{}
     foreach ($entry in ($map | Where-Object { $_.Type -eq 'Aliased' })) {
         $baseCmd = ($entry.Bash -split '\s+')[0]
         if (-not $aliasedMap.ContainsKey($baseCmd)) {
             $aliasedMap[$baseCmd] = @()
         }
         $aliasedMap[$baseCmd] += $entry
+
+        $psCmdlet = ($entry.PowerShell -split '\s+')[0]
+        if ($psCmdlet) {
+            if (-not $aliasedCmdletMap.ContainsKey($psCmdlet)) {
+                $aliasedCmdletMap[$psCmdlet] = @()
+            }
+            $aliasedCmdletMap[$psCmdlet] += $entry
+        }
     }
     $script:AliasedCommandMap = $aliasedMap
+    $script:AliasedCmdletMap = $aliasedCmdletMap
     $script:FormatFunc = Get-Command Format-Suggestion
 
     $function:global:prompt = {
@@ -69,7 +79,16 @@ function Register-PSCommandHelperPrompt {
                         }
                     }
 
+                    $entries = $null
                     if ($lookupName -and $script:AliasedCommandMap.ContainsKey($lookupName)) {
+                        $entries = $script:AliasedCommandMap[$lookupName]
+                    }
+                    elseif ($script:AliasedCmdletMap -and $script:AliasedCmdletMap.ContainsKey($cmdName)) {
+                        $entries = $script:AliasedCmdletMap[$cmdName]
+                        $lookupName = $cmdName
+                    }
+
+                    if ($entries) {
                         $errString = $lastErr.ToString()
                         # Only show for parameter-binding or argument errors (bash-style flags)
                         $isParamError = $lastErr.Exception -is [System.Management.Automation.ParameterBindingException] -or
@@ -80,7 +99,6 @@ function Register-PSCommandHelperPrompt {
                         if ($isParamError) {
                             # Find the best matching entry using flag-aware comparison
                             $line = if ($lastErr.InvocationInfo) { $lastErr.InvocationInfo.Line.Trim() } else { $lookupName }
-                            $entries = $script:AliasedCommandMap[$lookupName]
 
                             # Extract and normalize flags from the typed line
                             $lineFlags = [System.Collections.Generic.HashSet[char]]::new()

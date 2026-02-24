@@ -155,12 +155,21 @@ Describe 'Prompt handler: reverse alias lookup' {
         InModuleScope PSCommandHelper {
             $map = Get-BashToPowerShellMap
             $script:TestAliasedMap = @{}
+            $script:TestAliasedCmdletMap = @{}
             foreach ($entry in ($map | Where-Object { $_.Type -eq 'Aliased' })) {
                 $baseCmd = ($entry.Bash -split '\s+')[0]
                 if (-not $script:TestAliasedMap.ContainsKey($baseCmd)) {
                     $script:TestAliasedMap[$baseCmd] = @()
                 }
                 $script:TestAliasedMap[$baseCmd] += $entry
+
+                $psCmdlet = ($entry.PowerShell -split '\s+')[0]
+                if ($psCmdlet) {
+                    if (-not $script:TestAliasedCmdletMap.ContainsKey($psCmdlet)) {
+                        $script:TestAliasedCmdletMap[$psCmdlet] = @()
+                    }
+                    $script:TestAliasedCmdletMap[$psCmdlet] += $entry
+                }
             }
         }
     }
@@ -171,43 +180,66 @@ Describe 'Prompt handler: reverse alias lookup' {
         }
     }
 
-    It 'Remove-Item reverse-resolves to rm which is in the aliased map' {
-        $aliases = Get-Alias -Definition 'Remove-Item' -ErrorAction SilentlyContinue
-        $aliasNames = $aliases | ForEach-Object { $_.Name }
-        $aliasNames | Should -Contain 'rm'
-    }
-
-    It 'Get-ChildItem reverse-resolves to ls which is in the aliased map' {
-        $aliases = Get-Alias -Definition 'Get-ChildItem' -ErrorAction SilentlyContinue
-        $aliasNames = $aliases | ForEach-Object { $_.Name }
-        $aliasNames | Should -Contain 'ls'
-    }
-
-    It 'Copy-Item reverse-resolves to cp which is in the aliased map' {
+    It 'has cmdlet fallback entries for Remove-Item and Get-ChildItem' {
         InModuleScope PSCommandHelper {
-            $aliases = Get-Alias -Definition 'Copy-Item' -ErrorAction SilentlyContinue
-            $found = $false
-            foreach ($a in $aliases) {
-                if ($script:TestAliasedMap.ContainsKey($a.Name)) {
-                    $found = $true
-                    break
-                }
-            }
-            $found | Should -BeTrue
+            $script:TestAliasedCmdletMap.ContainsKey('Remove-Item') | Should -BeTrue
+            $script:TestAliasedCmdletMap.ContainsKey('Get-ChildItem') | Should -BeTrue
         }
     }
 
-    It 'Move-Item reverse-resolves to mv which is in the aliased map' {
+    It 'resolves Remove-Item to aliased suggestions by alias or cmdlet fallback' {
         InModuleScope PSCommandHelper {
-            $aliases = Get-Alias -Definition 'Move-Item' -ErrorAction SilentlyContinue
-            $found = $false
+            $resolvedEntries = $null
+            $aliases = Get-Alias -Definition 'Remove-Item' -ErrorAction SilentlyContinue
             foreach ($a in $aliases) {
                 if ($script:TestAliasedMap.ContainsKey($a.Name)) {
-                    $found = $true
+                    $resolvedEntries = $script:TestAliasedMap[$a.Name]
                     break
                 }
             }
-            $found | Should -BeTrue
+            if (-not $resolvedEntries) {
+                $resolvedEntries = $script:TestAliasedCmdletMap['Remove-Item']
+            }
+
+            $resolvedEntries | Should -Not -BeNullOrEmpty
+        }
+    }
+
+    It 'resolves Get-ChildItem to aliased suggestions by alias or cmdlet fallback' {
+        InModuleScope PSCommandHelper {
+            $resolvedEntries = $null
+            $aliases = Get-Alias -Definition 'Get-ChildItem' -ErrorAction SilentlyContinue
+            foreach ($a in $aliases) {
+                if ($script:TestAliasedMap.ContainsKey($a.Name)) {
+                    $resolvedEntries = $script:TestAliasedMap[$a.Name]
+                    break
+                }
+            }
+            if (-not $resolvedEntries) {
+                $resolvedEntries = $script:TestAliasedCmdletMap['Get-ChildItem']
+            }
+
+            $resolvedEntries | Should -Not -BeNullOrEmpty
+        }
+    }
+
+    It 'resolves Copy-Item and Move-Item by alias or cmdlet fallback' {
+        InModuleScope PSCommandHelper {
+            foreach ($cmdlet in @('Copy-Item', 'Move-Item')) {
+                $resolvedEntries = $null
+                $aliases = Get-Alias -Definition $cmdlet -ErrorAction SilentlyContinue
+                foreach ($a in $aliases) {
+                    if ($script:TestAliasedMap.ContainsKey($a.Name)) {
+                        $resolvedEntries = $script:TestAliasedMap[$a.Name]
+                        break
+                    }
+                }
+                if (-not $resolvedEntries) {
+                    $resolvedEntries = $script:TestAliasedCmdletMap[$cmdlet]
+                }
+
+                $resolvedEntries | Should -Not -BeNullOrEmpty
+            }
         }
     }
 }
