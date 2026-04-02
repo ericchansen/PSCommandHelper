@@ -1,0 +1,145 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0c0c1d"/>
+      <stop offset="50%" stop-color="#1a1a3e"/>
+      <stop offset="100%" stop-color="#0f0f2d"/>
+    </linearGradient>
+    <linearGradient id="termBorder" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3a3a5c"/>
+      <stop offset="100%" stop-color="#2a2a4a"/>
+    </linearGradient>
+    <linearGradient id="titleGlow" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#56b6ff"/>
+      <stop offset="50%" stop-color="#a78bfa"/>
+      <stop offset="100%" stop-color="#ff6b9d"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="softGlow">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="630" fill="url(#bg)"/>
+
+  <!-- Subtle grid pattern -->
+  <g opacity="0.03">
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#ffffff" stroke-width="0.5"/>
+    </pattern>
+    <rect width="1200" height="630" fill="url(#grid)"/>
+  </g>
+
+  <!-- Decorative glow orbs -->
+  <circle cx="100" cy="500" r="200" fill="#56b6ff" opacity="0.03" filter="url(#softGlow)"/>
+  <circle cx="1100" cy="130" r="180" fill="#a78bfa" opacity="0.03" filter="url(#softGlow)"/>
+
+  <!-- Terminal window -->
+  <g transform="translate(60, 35)">
+    <!-- Terminal shadow -->
+    <rect x="6" y="6" width="1074" height="554" rx="8" fill="#000000" opacity="0.4"/>
+
+    <!-- Terminal body -->
+    <rect x="0" y="0" width="1074" height="554" rx="8" fill="#0c0c0c" stroke="url(#termBorder)" stroke-width="1"/>
+
+    <!-- Title bar background (dark gray, like WT) -->
+    <rect x="0" y="0" width="1074" height="40" rx="8" fill="#202020"/>
+    <rect x="0" y="8" width="1074" height="32" fill="#202020"/>
+
+    <!-- Active tab (rounded top, flat bottom, blends into terminal body) -->
+    <path d="M8,40 L8,12 Q8,4 16,4 L164,4 Q172,4 172,12 L172,40 Z" fill="#0c0c0c"/>
+    <!-- Tab icon + text -->
+    <text x="20" y="27" font-family="Segoe UI, Inter, system-ui, sans-serif" font-size="12.5" fill="#ccccdd">❯ pwsh</text>
+    <!-- Tab close × -->
+    <line x1="148" y1="17" x2="155" y2="24" stroke="#777788" stroke-width="1.2"/>
+    <line x1="155" y1="17" x2="148" y2="24" stroke="#777788" stroke-width="1.2"/>
+
+    <!-- + new tab button -->
+    <line x1="196" y1="20" x2="210" y2="20" stroke="#777788" stroke-width="1.5"/>
+    <line x1="203" y1="13" x2="203" y2="27" stroke="#777788" stroke-width="1.5"/>
+
+    <!-- Window controls (right side: minimize, maximize, close) -->
+    <g transform="translate(932, 0)">
+      <!-- Minimize ─ -->
+      <rect x="0" y="0" width="46" height="40" fill="transparent"/>
+      <line x1="17" y1="20" x2="29" y2="20" stroke="#999999" stroke-width="1"/>
+      <!-- Maximize □ -->
+      <rect x="46" y="0" width="46" height="40" fill="transparent"/>
+      <rect x="63" y="14" width="11" height="11" rx="0.5" fill="none" stroke="#999999" stroke-width="1"/>
+      <!-- Close × -->
+      <rect x="92" y="0" width="46" height="40" fill="transparent"/>
+      <line x1="108" y1="15" x2="118" y2="25" stroke="#999999" stroke-width="1"/>
+      <line x1="118" y1="15" x2="108" y2="25" stroke="#999999" stroke-width="1"/>
+    </g>
+
+    <!-- Terminal content area -->
+    <g transform="translate(28, 60)">
+      <!-- Prompt line 1 -->
+      <text y="0" font-family="SF Mono, Cascadia Code, Consolas, monospace" font-size="16">
+        <tspan fill="#6c9ef8">PS</tspan>
+        <tspan fill="#888899"> ~/project</tspan>
+        <tspan fill="#6c9ef8">&gt;</tspan>
+        <tspan fill="#e0e0e0"> rm -rf ./build</tspan>
+      </text>
+
+      <!-- PowerShell error (red) -->
+      <text y="25" font-family="SF Mono, Cascadia Code, Consolas, monospace" font-size="15" fill="#f14c4c">Remove-Item: A parameter cannot be found that matches parameter name 'rf'.</text>
+
+      <!-- PSCommandHelper card -->
+      <text y="55" font-family="SF Mono, Cascadia Code, Consolas, monospace" font-size="15" fill="#555577">────────────────────────────────────────────────────────────────</text>
+
+      <text y="78" font-family="SF Mono, Cascadia Code, Consolas, monospace" font-size="16">
+        <tspan fill="#888899">  💡 </tspan>
+        <tspan fill="#febc2e" font-weight="bold">PSCommandHelper</tspan>
+        <tspan fill="#888899">  (alias tip)</tspan>
+      </text>
+
+      <text y="108" font-family="SF Mono, Cascadia Code, Consolas, monospace" font-size="16">
+        <tspan fill="#888899">  You typed:  </tspan>
+        <tspan fill="#ff6b9d">rm -rf ./build</tspan>
+      </text>
+
+      <text y="133" font-family="SF Mono, Cascadia Code, Consolas, monospace" font-size="16">
+        <tspan fill="#888899">  PS equivalent: </tspan>
+        <tspan fill="#28c840" font-weight="bold">Remove-Item -Recurse -Force</tspan>
+      </text>
+
+      <text y="163" font-family="SF Mono, Cascadia Code, Consolas, monospace" font-size="15" fill="#b0b0cc">  Remove-Item deletes files/folders. -Recurse handles</text>
+      <text y="183" font-family="SF Mono, Cascadia Code, Consolas, monospace" font-size="15" fill="#b0b0cc">  subdirectories, -Force skips confirmation.</text>
+
+      <text y="210" font-family="SF Mono, Cascadia Code, Consolas, monospace" font-size="15" fill="#888899">  Note: `rm -rf` is already aliased in PS, but the flags differ.</text>
+
+      <text y="240" font-family="SF Mono, Cascadia Code, Consolas, monospace" font-size="15" fill="#888899">  Example:</text>
+      <text y="265" font-family="SF Mono, Cascadia Code, Consolas, monospace" font-size="15">
+        <tspan fill="#888899">  &gt; </tspan>
+        <tspan fill="#a78bfa">Remove-Item</tspan>
+        <tspan fill="#e0e0e0"> ./build -Recurse -Force</tspan>
+      </text>
+
+      <text y="290" font-family="SF Mono, Cascadia Code, Consolas, monospace" font-size="15" fill="#555577">────────────────────────────────────────────────────────────────</text>
+
+      <!-- Prompt line 2 -->
+      <text y="325" font-family="SF Mono, Cascadia Code, Consolas, monospace" font-size="16">
+        <tspan fill="#6c9ef8">PS</tspan>
+        <tspan fill="#888899"> ~/project</tspan>
+        <tspan fill="#6c9ef8">&gt;</tspan>
+      </text>
+
+      <!-- Cursor (static) -->
+      <rect x="140" y="310" width="10" height="19" fill="#ffffff" opacity="0.8"/>
+    </g>
+  </g>
+
+
+</svg>
