@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/hero-animated.svg" alt="PSCommandHelper — type rm -rf ./build, get Remove-Item -Recurse -Force" width="900">
+</p>
+
 # PSCommandHelper
 
 > Learn PowerShell by doing. When you type a bash command that doesn't work in PowerShell, PSCommandHelper suggests the PowerShell equivalent — with an explanation.
