@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/hero-animated.svg" alt="PSCommandHelper — type rm -rf ./build, get Remove-Item -Recurse -Force" width="900">
+  <img src="assets/hero-animated.gif" alt="PSCommandHelper — type rm -rf ./build, get Remove-Item -Recurse -Force" width="900">
 </p>
 
 # PSCommandHelper
